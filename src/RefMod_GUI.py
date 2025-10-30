@@ -17,9 +17,9 @@ import signal
 import json
 import sys
 
-SETTINGS_FILE = "../config/RefMod_GUI_settings.json" # User preferences file
-DOCS_PATH = "docs/docs.pdf" # Documentation
 ROOT_DIR = Path(__file__).parent.parent
+SETTINGS_FILE = ROOT_DIR/"config/RefMod_GUI_settings.json" # User preferences file
+DOCS_PATH = "docs/docs.pdf" # Documentation
 
 def load_settings():
     """Load saved user settings"""
@@ -110,7 +110,7 @@ def custom_popup(title, message, image_file, window_size=(500, 450)):
         size=window_size,
         element_justification="center",
         finalize=True,
-        icon='../assets/RefMod_icon.ico'
+        icon=ROOT_DIR/'assets/RefMod_icon.ico'
     )
 
     while True:
@@ -371,7 +371,7 @@ layout = [
         [sg.Tab('Parameters', iniedit_layout, key='-INI_TAB-'), sg.Tab('Run RefMod', run_layout, key='-RUN_TAB-')]
     ])]
 ]
-window = sg.Window("RefMod GUI", layout, icon='../assets/RefMod_icon.ico')
+window = sg.Window("RefMod GUI", layout, icon=ROOT_DIR/'assets/RefMod_icon.ico')
 
 buffer = []
 process = None
@@ -566,7 +566,7 @@ while True:
     elif event == "About":
         about_text = "\nRefMod is an implementation of the ReCom concept (Laguillo-Gómez et al., 2023) designed to be run as a post-processing step after an open MSFragger search. It is compatible with both DDA and DIA data. When using RefMod, DIA data can be searched in a “pseudo-DDA” workflow, using a curated list of theoretical Δmass values to correct errors caused by the uncertainty in precursor masses contained within the same fragmentation window. \n\nRefMod has been developed at the Cardiovascular Proteomics Lab / Proteomics Unit at CNIC (Spanish National Centre for Cardiovascular Research). "
         version_text = "\n\nVersion v1.0"
-        custom_popup(title="About RefMod", message=about_text+version_text, image_file="../assets/RefMod_logo_text.png")
+        custom_popup(title="About RefMod", message=about_text+version_text, image_file=ROOT_DIR/"assets/RefMod_logo_text.png")
 
     elif event == "-PROCESS-":
         process = values[event]
