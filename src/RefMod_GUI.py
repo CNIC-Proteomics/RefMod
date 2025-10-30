@@ -107,7 +107,8 @@ def custom_popup(title, message, image_file, window_size=(500, 450)):
         modal=True,
         size=window_size,
         element_justification="center",
-        finalize=True
+        finalize=True,
+        icon='../assets/RefMod_icon.ico'
     )
 
     while True:
