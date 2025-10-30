@@ -7,6 +7,7 @@ Created on Tue Oct 21 11:20:47 2025
 
 import PySimpleGUI as sg
 from PIL import Image
+from pathlib import Path
 import configparser
 import subprocess
 import threading
@@ -17,7 +18,8 @@ import json
 import sys
 
 SETTINGS_FILE = "../config/RefMod_GUI_settings.json" # User preferences file
-DOCS_PATH = "../docs/docs.pdf" # Documentation
+DOCS_PATH = "docs/docs.pdf" # Documentation
+ROOT_DIR = Path(__file__).parent.parent
 
 def load_settings():
     """Load saved user settings"""
@@ -553,11 +555,11 @@ while True:
     elif event == "Help":
         try:
             if sys.platform.startswith('darwin'):  # macOS
-                subprocess.call(('open', DOCS_PATH))
+                subprocess.call(('open', ROOT_DIR / DOCS_PATH))
             elif os.name == 'nt':  # Windows
-                os.startfile(DOCS_PATH)
+                os.startfile(ROOT_DIR / DOCS_PATH)
             elif os.name == 'posix':  # Linux
-                subprocess.call(('xdg-open', DOCS_PATH))
+                subprocess.call(('xdg-open', ROOT_DIR / DOCS_PATH))
         except Exception as e:
             sg.popup_error(f"Could not open help file:\n{e}")
             
