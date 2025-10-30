@@ -297,9 +297,9 @@ iniedit_layout = [
         
         [sg.Text("\nFDR PARAMETERS", font=bold)],
         [sg.Text("Protein Column", size=(25,1), tooltip=" Name of the column containing protein names. "),
-         sg.Input(default_text=settings.get("-PROTEIN-", False), key="-PROTEIN-", size=(40,1))],
+         sg.Input(default_text=settings.get("-PROTEIN-", "protein"), key="-PROTEIN-", size=(40,1))],
         [sg.Text("Decoy Prefix", size=(25,1), tooltip=" The prefix that marks decoy protein IDs. "),
-         sg.Input(default_text=settings.get("-DECOY-", False), key="-DECOY-", size=(40,1))],
+         sg.Input(default_text=settings.get("-DECOY-", "DECOY"), key="-DECOY-", size=(40,1))],
         [sg.Text("Filter Targets", size=(25,1), tooltip=" Remove Decoys from output. "),
          sg.Checkbox("", default=settings.get("-FILTER_TARGET-", False), key="-FILTER_TARGET-")],
         [sg.Text("Filter FDR", size=(25,1), tooltip=" Remove PSMs above this FDR threshold. \n A value of 0 ignores this parameter. "),
