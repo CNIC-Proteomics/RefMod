@@ -6,9 +6,11 @@ Created on Tue Oct 21 11:20:47 2025
 """
 
 import PySimpleGUI as sg
+from PIL import Image
 import configparser
 import subprocess
 import threading
+import io
 import os
 import signal
 import json
@@ -59,6 +61,60 @@ def dict_to_ini(data, file_path):
         config[section][key] = value
     with open(file_path, "w") as f:
         config.write(f)
+        
+def custom_popup(title, message, image_file, window_size=(500, 450)):
+    with Image.open(image_file) as img:
+        img_ratio = img.width / img.height
+        target_width = window_size[0] - 40  # leave a little padding
+        target_height = int(target_width / img_ratio)
+        img_resized = img.resize((target_width, target_height))
+        bio = io.BytesIO()
+        img_resized.save(bio, format="PNG")
+        image_data = bio.getvalue()
+        
+    layout = [
+        [sg.Column(
+            [[sg.Image(data=image_data, key="-REFMOD_LOGO-")]],
+            justification="center",
+            element_justification="center",
+            expand_x=True
+        )],
+        
+        [sg.Multiline(
+            message,
+            size=(None, None),
+            expand_x=True,
+            expand_y=True,
+            border_width=0,
+            background_color=sg.theme_background_color(),
+            text_color=sg.theme_text_color(),
+            no_scrollbar=True,
+            disabled=True,
+            pad=(10, 10)
+        )],
+        
+        [sg.Column(
+            [[sg.Button("Close", size=(10, 1))]],
+            justification="center",
+            element_justification="center",
+            expand_x=True
+        )],
+    ]
+
+    window = sg.Window(
+        title,
+        layout,
+        modal=True,
+        size=window_size,
+        element_justification="center",
+        finalize=True
+    )
+
+    while True:
+        event, _ = window.read()
+        if event in (sg.WINDOW_CLOSED, "Close"):
+            break
+    window.close()
 
 def run_script(values, window):
     """Build command and run RefMod"""
@@ -139,6 +195,7 @@ def run_script(values, window):
 
 # Load saved settings
 settings = load_settings()
+sg.theme('TealMono')
 
 # GUI layout
 italic = (sg.DEFAULT_FONT[0], sg.DEFAULT_FONT[1], "italic")
@@ -504,8 +561,9 @@ while True:
             sg.popup_error(f"Could not open help file:\n{e}")
             
     elif event == "About":
-        sg.popup("RefMod is an implementation of the ReCom concept (Laguillo-Gómez et al., 2023) designed to be run as a post-processing step after an open MSFragger search. It is compatible with both DDA and DIA data. When using RefMod, DIA data can be searched in a “pseudo-DDA” workflow, using a curated list of theoretical Δmass values to correct errors caused by the uncertainty in precursor masses contained within the same fragmentation window. \n\nRefMod has been developed at the Cardiovascular Proteomics Lab / Proteomics Unit at CNIC (Spanish National Centre for Cardiovascular Research). ",
-                 title="About RefMod")
+        about_text = "\nRefMod is an implementation of the ReCom concept (Laguillo-Gómez et al., 2023) designed to be run as a post-processing step after an open MSFragger search. It is compatible with both DDA and DIA data. When using RefMod, DIA data can be searched in a “pseudo-DDA” workflow, using a curated list of theoretical Δmass values to correct errors caused by the uncertainty in precursor masses contained within the same fragmentation window. \n\nRefMod has been developed at the Cardiovascular Proteomics Lab / Proteomics Unit at CNIC (Spanish National Centre for Cardiovascular Research). "
+        version_text = "\n\nVersion v1.0"
+        custom_popup(title="About RefMod", message=about_text+version_text, image_file="../assets/RefMod_logo_text.png")
 
     elif event == "-PROCESS-":
         process = values[event]
