@@ -967,19 +967,19 @@ if __name__ == '__main__':
         sys.exit('ERROR: Cannot find configuration file at' + str(args.config))
     # if something is changed, write a copy of ini
     if mass.getint('Logging', 'create_ini') == 1:
-        with open(os.path.dirname(args.infile) + '/ReFrag.ini', 'w') as newconfig:
+        with open(os.path.dirname(args.infile) + '/RefMod.ini', 'w') as newconfig:
             mass.write(newconfig)
 
     # logging debug level. By default, info level
     if os.path.isdir(args.infile):
-        log_file = os.path.join(args.infile + '/ReFrag.log')
-        log_file_debug = os.path.join(args.infile + '/ReFrag_debug.log')
+        log_file = os.path.join(args.infile + '/RefMod.log')
+        log_file_debug = os.path.join(args.infile + '/RefMod_debug.log')
     elif '*' in args.infile:
-        log_file = os.path.join(os.path.dirname(args.infile) + '/' + os.path.basename(args.infile).replace("*", "") + '_ReFrag.log')
-        log_file_debug = os.path.join(os.path.dirname(args.infile) + '/' + os.path.basename(args.infile).replace("*", "") + '_ReFrag_debug.log')
+        log_file = os.path.join(os.path.dirname(args.infile) + '/' + os.path.basename(args.infile).replace("*", "") + '_RefMod.log')
+        log_file_debug = os.path.join(os.path.dirname(args.infile) + '/' + os.path.basename(args.infile).replace("*", "") + '_RefMod_debug.log')
     else:
-        log_file = args.infile[:-4] + '_ReFrag.log'
-        log_file_debug = args.infile[:-4] + '_ReFrag_debug.log'
+        log_file = args.infile[:-4] + '_RefMod.log'
+        log_file_debug = args.infile[:-4] + '_RefMod_debug.log'
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG,
                             format='%(asctime)s - %(levelname)s - %(message)s',
