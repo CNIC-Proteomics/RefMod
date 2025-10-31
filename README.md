@@ -1,4 +1,4 @@
-![](https://img.shields.io/github/v/release/CNIC-Proteomics/RefMod)
+![](https://img.shields.io/github/v/release/CNIC-Proteomics/RefMod) ![](https://img.shields.io/github/downloads/CNIC-Proteomics/RefMod/total)
 
 ![RefMod logo](/assets/RefMod_logo_text_white.svg)
 
