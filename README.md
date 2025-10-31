@@ -1,3 +1,5 @@
+![](https://img.shields.io/github/v/release/CNIC-Proteomics/RefMod)
+
 ![RefMod logo](/assets/RefMod_logo_text_white.svg)
 
 # Description
