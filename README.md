@@ -1,4 +1,4 @@
-![](https://img.shields.io/github/v/release/CNIC-Proteomics/RefMod) ![](https://img.shields.io/github/downloads/CNIC-Proteomics/RefMod/total)
+![Release](https://img.shields.io/github/v/release/CNIC-Proteomics/RefMod) ![Downloads](https://img.shields.io/github/downloads/CNIC-Proteomics/RefMod/total) ![Visitors](https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2FCNIC-Proteomics%2FRefMod&label=repository%20visits&countColor=%230c7ebe&style=flat&labelStyle=none)
 
 ![RefMod logo](/assets/RefMod_logo_text_white.svg)
 
