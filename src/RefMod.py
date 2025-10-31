@@ -43,7 +43,7 @@ def checkParams(mass, infiles):
     for f in infiles:
         cols = pd.read_csv(f, index_col=0, nrows=0, sep="\t").columns.tolist()
         if prot_column not in cols:
-            logging.error('The file ' + str(f) + 'does not contain a ' + str(prot_column) + ' column. Please check the name of the protein column.')
+            logging.error('The file ' + str(f) + ' does not contain a ' + str(prot_column) + ' column. Please check the name of the protein column.')
             return(1)
     return(0)
 
