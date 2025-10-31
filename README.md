@@ -13,6 +13,6 @@ This section provides a brief overview of the basic requirements to run RefMod f
 2. Install Python 3.11 and the packages from `requirements.txt`.
 3. Prepare your configuration file and run RefMod from the GUI or from the command line:
 `$ python RefMod.py -i [MSFragger files] -r [MGF or mzML files] -d [Theoretical Δmasses file] -c [Configuration file]`
-5. Find the output files in a newly created refrag directory in the same path specified by the -i option.
+5. Find the output files in a newly created `refmod` directory in the same path specified by the -i option.
           
           
