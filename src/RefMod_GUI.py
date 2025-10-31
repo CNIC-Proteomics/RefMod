@@ -121,7 +121,7 @@ def custom_popup(title, message, image_file, window_size=(500, 450)):
 
 def run_script(values, window):
     """Build command and run RefMod"""
-    cmd = [sys.executable, "RefMod.py"]
+    cmd = [sys.executable, ROOT_DIR/"src/RefMod.py"]
 
     # Required arguments
     cmd += ["-i", values["-INFILE-"]]
@@ -255,7 +255,7 @@ for name, code in amino_acids:
     ])
 
 iniedit_layout = [
-    [sg.Text("Configuration File:"), sg.Input(settings.get("-CONFIG-", ""), key="-CONFIG-"),
+    [sg.Text("Configuration File:"), sg.Input(settings.get("-CONFIG-", ROOT_DIR/"config/RefMod.ini"), key="-CONFIG-"),
      sg.FileBrowse(file_types = (('INI Files', '*.ini;*.INI'),), initial_folder = "."),
      sg.Button("Load Config"),
      sg.Button("Save Config", key="-SAVE_CONFIG-"),
@@ -337,7 +337,7 @@ run_layout = [
      sg.FileBrowse(button_text = "Load File", file_types = (('MS Data Files', '*.mzML;*.MGF;*.mzml;*.mgf'),), key="-BROWSE_RAW-"),
      sg.FolderBrowse(button_text = "Load Folder", target="-RAWFILE-", key="-BROWSE_RAW_FOLDER-")],
     [sg.Text("Δmass File", size=(25,1), justification='right'),
-     sg.Input(settings.get("-DMFILE-", ""), key="-DMFILE-", size=(60,1), enable_events=True),
+     sg.Input(settings.get("-DMFILE-", ROOT_DIR/"data/dm_list.tsv"), key="-DMFILE-", size=(60,1), enable_events=True),
      sg.FileBrowse(button_text = "Load File", file_types = (('Tab-separated Text Files', '*.tsv;*.txt'),), key="-BROWSE_DM-")],
     # [sg.Text("_chN Files", size=(25,1), justification='right'),
     #  sg.Input(settings.get("-DIA-", ""), key="-DIA-", size=(60,1), enable_events=True)],
@@ -351,7 +351,7 @@ run_layout = [
      sg.Input(settings.get("-OUTDIR-", ""), key="-OUTDIR-", size=(60,1), enable_events=True),
      sg.FolderBrowse(button_text = "Select Folder", key="-BROWSE_OUTPUT-")],
     [sg.Text("Config file", size=(25,1), justification='right'),
-     sg.Input(settings.get("-CONFIG_TO_RUN-", ""), key="-CONFIG_TO_RUN-", size=(60,1), enable_events=True),
+     sg.Input(settings.get("-CONFIG_TO_RUN-", ROOT_DIR/"config/RefMod.ini"), key="-CONFIG_TO_RUN-", size=(60,1), enable_events=True),
      sg.FileBrowse(button_text = "Load File", key="-BROWSE_CONFIG-")],
      #sg.Button("Load Config", key="-LOAD_CONFIG-")],
     [sg.Text("Number of workers", size=(25,1), justification='right'),
