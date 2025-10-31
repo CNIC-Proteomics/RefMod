@@ -8,7 +8,7 @@
  RefMod has been developed at the [Cardiovascular Proteomics Lab](https://www.cnic.es/en/investigacion/cardiovascular-proteomics) / [Proteomics Unit](https://www.cnic.es/en/investigacion/proteomics) at CNIC (Spanish National Centre for Cardiovascular Research).
 
 # Quick Start Guide
-This section provides a brief overview of the basic requirements to run RefMod. If this is your first time using RefMod, or if you’re looking for an in-depth explanation of any step, please refer to the [full documentation](/docs/docs.pdf).
+This section provides a brief overview of the basic requirements to run RefMod from the command line. A GUI is also available and can be launched using the `RefMod.bat` file located in the root directory. If this is your first time using RefMod, or if you’re looking for an in-depth explanation of any step, please refer to the [full documentation](/docs/docs.pdf).
 1. Download the latest release from the GitHub page.
 2. Install Python 3.11 and the packages from `requirements.txt`.
 3. Prepare your configuration file and run RefMod from the GUI or from the command line:
