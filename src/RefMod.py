@@ -727,6 +727,7 @@ def main(args):
     m_proton = mass.getfloat('Masses', 'm_proton')
     m_hydrogen = mass.getfloat('Masses', 'm_hydrogen')
     m_oxygen = mass.getfloat('Masses', 'm_oxygen')
+    create_summary = bool(int(mass._sections['Logging']['create_summary']))
     # Debug
     debug_scores = bool(int(mass._sections['Debug']['debug_scores']))
     
@@ -923,11 +924,12 @@ def main(args):
         df.to_csv(outpath, index=False, sep='\t', encoding='utf-8')
         logging.info("Done.")
 
-        if len(args.scanrange) > 0:
-            outsum = Path(outdir) / f"{outsum.stem}_{str(args.scanrange[0]) + '-' + str(args.scanrange[1])}{outsum.suffix}"
-        logging.info(f"Writing summary file {outsum}...")
-        makeSummary(df, outsum, infile, rawfile, args.dmfile, starttime, endtime, decoy_prefix, prot_column)
-        logging.info("Done.")
+        if create_summary:
+            if len(args.scanrange) > 0:
+                outsum = Path(outdir) / f"{outsum.stem}_{str(args.scanrange[0]) + '-' + str(args.scanrange[1])}{outsum.suffix}"
+            logging.info(f"Writing summary file {outsum}...")
+            makeSummary(df, outsum, infile, rawfile, args.dmfile, starttime, endtime, decoy_prefix, prot_column)
+            logging.info("Done.")
 
     return
 

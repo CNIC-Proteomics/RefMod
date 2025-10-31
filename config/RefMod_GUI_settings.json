@@ -70,6 +70,7 @@
   "-OXYGEN_MASS-": "15.994915",
   "-CREATE_LOG-": true,
   "-CREATE_INI-": true,
+  "-CREATE_SUMMARY-": true,
   "-DEBUG_SCORES-": false,
   "-INFILE-": "",
   "-BROWSE_FILE-": "",

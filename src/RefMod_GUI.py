@@ -321,6 +321,8 @@ iniedit_layout = [
          sg.Checkbox("", default=settings.get("-CREATE_LOG-", True), key="-CREATE_LOG-")],
         [sg.Text("Create INI", size=(25,1), tooltip=" Create a copy of the configuration file in the input directory. "),
          sg.Checkbox("", default=settings.get("-CREATE_INI-", True), key="-CREATE_INI-")],
+        [sg.Text("Create Summary", size=(25,1), tooltip=" Create summary files containing metadata about each search. "),
+         sg.Checkbox("", default=settings.get("-CREATE_SUMMARY-", True), key="-CREATE_SUMMARY-")],
         
         [sg.Text("\nDEBUG", font=bold)],
         [sg.Text("Debug Scores", size=(25,1)), sg.Checkbox("", default=settings.get("-DEBUG_SCORES-", False), key="-DEBUG_SCORES-")],
@@ -464,6 +466,7 @@ while True:
             # LOGGING
             window["-CREATE_LOG-"].update(bool(int((config._sections['Logging']['create_log']))))
             window["-CREATE_INI-"].update(bool(int((config._sections['Logging']['create_ini']))))
+            window["-CREATE_SUMMARY-"].update(bool(int((config._sections['Logging']['create_summary']))))
             # DEBUG
             window["-DEBUG_SCORES-"].update(bool(int((config._sections['Debug']['debug_scores']))))
             
@@ -492,6 +495,7 @@ while True:
                     "FDR.filter_fdr": str(values["-FILTER_FDR-"]),
                     "Logging.create_log": "1" if values["-CREATE_LOG-"] else "0",
                     "Logging.create_ini": "1" if values["-CREATE_INI-"] else "0",
+                    "Logging.create_summary": "1" if values["-CREATE_SUMMARY-"] else "0",
                     "Debug.debug_scores": "1" if values["-DEBUG_SCORES-"] else "0",
                     "Masses.m_proton": values["-PROTON_MASS-"],
                     "Masses.m_hydrogen": values["-HYDROGEN_MASS-"],
@@ -542,6 +546,7 @@ while True:
         window["-FILTER_FDR-"].update(0)
         window["-CREATE_LOG-"].update(True)
         window["-CREATE_INI-"].update(True)
+        window["-CREATE_SUMMARY-"].update(True)
         window["-DEBUG_SCORES-"].update(False)
         for name, code in amino_acids:
                 mass = default_masses.get(code.upper(), "")
