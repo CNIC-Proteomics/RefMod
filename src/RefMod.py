@@ -631,7 +631,7 @@ def parallelFragging(query, parlist):
 
 def makeSummary(df, outpath, infile, raw, dmlist, startt, endt, decoy, protein):
     
-    smods = df.REFRAG_name.value_counts()
+    smods = df.REFMOD_name.value_counts()
     smods = smods[smods.index!='EXPERIMENTAL']
     lsmods = []
     for i in range(0, len(smods)):
@@ -646,8 +646,8 @@ def makeSummary(df, outpath, infile, raw, dmlist, startt, endt, decoy, protein):
     "SEARCH TIME\t{time}\n"
     "TOTAL PSMs\t{total}\n"
     "TARGET PSMs\t{target}\n"
-    "REFRAGGED PSMs\t{refrag}\t({perc}% of total)\n"
-    "REFRAGGED TARGET PSMs\t{refragt}\t({perct}% of targets)\n\n"
+    "REFMODDED PSMs\t{refrag}\t({perc}% of total)\n"
+    "REFMODDED TARGET PSMs\t{refragt}\t({perct}% of targets)\n\n"
     "THEORETICAL MODIFICATIONS FREQUENCY\n\n"
     "{smods}").format(date=datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
     infile=str(infile),
@@ -656,10 +656,10 @@ def makeSummary(df, outpath, infile, raw, dmlist, startt, endt, decoy, protein):
     time=str(endt-startt),
     total=str(len(df)),
     target=str(len(df[~df[protein].str.startswith(decoy)])),
-    refrag=str(len(df[df.REFRAG_name!='EXPERIMENTAL'])),
-    perc=str(round(len(df[df.REFRAG_name!='EXPERIMENTAL'])/len(df)*100,2)),
-    refragt=str(len(df[(df.REFRAG_name!='EXPERIMENTAL')&(~df[protein].str.startswith(decoy))])),
-    perct=str(round(len(df[(df.REFRAG_name!='EXPERIMENTAL')&(~df[protein].str.startswith(decoy))])/len(df[~df[protein].str.startswith(decoy)])*100,2)),
+    refrag=str(len(df[df.REFMOD_name!='EXPERIMENTAL'])),
+    perc=str(round(len(df[df.REFMOD_name!='EXPERIMENTAL'])/len(df)*100,2)),
+    refragt=str(len(df[(df.REFMOD_name!='EXPERIMENTAL')&(~df[protein].str.startswith(decoy))])),
+    perct=str(round(len(df[(df.REFMOD_name!='EXPERIMENTAL')&(~df[protein].str.startswith(decoy))])/len(df[~df[protein].str.startswith(decoy)])*100,2)),
     smods=lsmods)
     
     with open(outpath, 'w') as f:
@@ -682,22 +682,22 @@ def formatSiteRange(score_range, peptide):
 def globalFDR(df, score_column, prot_column, decoy_prefix, filter_target=False, filter_fdr=0):
     fl = len(df)
     df['row_index'] = range(1, len(df) + 1)
-    df['REFRAG_Label'] = df.apply(lambda x: 'Decoy' if (x[prot_column][0:len(decoy_prefix)]==decoy_prefix) else 'Target', axis = 1)
-    df.sort_values(by=[score_column, 'REFRAG_Label'], inplace=True, ascending=False)
-    df['Rank'] = df.groupby('REFRAG_Label').cumcount()+1
-    df['Rank_T'] = np.where(df['REFRAG_Label']=='Target', df['Rank'], 0)
+    df['REFMOD_Label'] = df.apply(lambda x: 'Decoy' if (x[prot_column][0:len(decoy_prefix)]==decoy_prefix) else 'Target', axis = 1)
+    df.sort_values(by=[score_column, 'REFMOD_Label'], inplace=True, ascending=False)
+    df['Rank'] = df.groupby('REFMOD_Label').cumcount()+1
+    df['Rank_T'] = np.where(df['REFMOD_Label']=='Target', df['Rank'], 0)
     df['Rank_T'] = df['Rank_T'].replace(0, np.nan).ffill()
-    df['Rank_D'] = np.where(df['REFRAG_Label'] == 'Decoy', df['Rank'], 0)
+    df['Rank_D'] = np.where(df['REFMOD_Label'] == 'Decoy', df['Rank'], 0)
     df['Rank_D'] =  df['Rank_D'].replace(0, np.nan).ffill()
-    df['REFRAG_FDR'] = df['Rank_D']/df['Rank_T']
-    df['REFRAG_FDR'] =  df['REFRAG_FDR'].replace(np.nan, 0).ffill()
+    df['REFMOD_FDR'] = df['Rank_D']/df['Rank_T']
+    df['REFMOD_FDR'] =  df['REFMOD_FDR'].replace(np.nan, 0).ffill()
     df.sort_values(by='row_index', inplace=True, ascending=True)
     if filter_fdr > 0:
         logging.info("Filtering at " + str(filter_fdr*100) + "% FDR...")
-        df = df[df.REFRAG_FDR <= filter_fdr]
+        df = df[df.REFMOD_FDR <= filter_fdr]
     if filter_target:
         logging.info("Removing decoys...")
-        df = df[~df.REFRAG_Label.str.startswith(decoy_prefix)]
+        df = df[~df.REFMOD_Label.str.startswith(decoy_prefix)]
     if filter_fdr > 0 or filter_target:
         logging.info(str(len(df)) + "out of " + str(fl) + " PSMs passed the filter(s).")
     df.drop(['row_index', 'Rank', 'Rank_T', 'Rank_D'], axis = 1, inplace = True)
@@ -783,7 +783,7 @@ def main(args):
         #dmdf[3] = np.array([''.join(set(''.join(literal_eval(i)).replace('N-term', '0').replace('C-term', '1'))) for i in dmdf[3]]) # Nt = 0, Ct = 1
         logging.info("\t" + str(len(dmdf[0])) + " theoretical DMs read.")
         # Prepare to parallelize
-        logging.info("Refragging...")
+        logging.info("Refmodding...")
         logging.info("\t" + "Locating scans...")
         starttime = datetime.now()
         if mode == "mzml":
@@ -870,41 +870,41 @@ def main(args):
             df = df.drop('spectrum', axis = 1)
         df['templist'] = refrags
         # Experimental information #
-        df['REFRAG_MH'] = pd.DataFrame(df.templist.tolist()).iloc[:, 0]. tolist()
-        df['REFRAG_exp_MZ'] = pd.DataFrame(df.templist.tolist()).iloc[:, 1]. tolist()
-        df['REFRAG_exp_DM'] = pd.DataFrame(df.templist.tolist()).iloc[:, 2]. tolist()
-        df['REFRAG_exp_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 3]. tolist()
-        df['REFRAG_exp_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 4]. tolist()
-          # TODO: df['REFRAG_exp_hyperscore_M']
-          # TODO: df['REFRAG_exp_hyperscore_H']
+        df['REFMOD_MH'] = pd.DataFrame(df.templist.tolist()).iloc[:, 0]. tolist()
+        df['REFMOD_exp_MZ'] = pd.DataFrame(df.templist.tolist()).iloc[:, 1]. tolist()
+        df['REFMOD_exp_DM'] = pd.DataFrame(df.templist.tolist()).iloc[:, 2]. tolist()
+        df['REFMOD_exp_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 3]. tolist()
+        df['REFMOD_exp_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 4]. tolist()
+          # TODO: df['REFMOD_exp_hyperscore_M']
+          # TODO: df['REFMOD_exp_hyperscore_H']
         # Non-modified information #
-        df['REFRAG_nm_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 5]. tolist()
-        df['REFRAG_nm_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 6]. tolist()
+        df['REFMOD_nm_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 5]. tolist()
+        df['REFMOD_nm_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 6]. tolist()
         # Modified information # (TESTING)
         if debug_scores:
-            df['REFRAG_MOD_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 7]. tolist()
-            df['REFRAG_HYB_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 8]. tolist()
+            df['REFMOD_MOD_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 7]. tolist()
+            df['REFMOD_HYB_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 8]. tolist()
         # Best candidate information #
-        df['REFRAG_score_range'] = pd.DataFrame(df.templist.tolist()).iloc[:, 9]. tolist()
-        df['REFRAG_site_range'] = df.apply(lambda x: formatSiteRange(x.REFRAG_score_range, x.peptide), axis=1)
-        df['REFRAG_DM'] =  pd.DataFrame(df.templist.tolist()).iloc[:, 10]. tolist()
-        df['REFRAG_site'] = pd.DataFrame(df.templist.tolist()).iloc[:, 11]. tolist()
-        df['REFRAG_sequence'] = pd.DataFrame(df.templist.tolist()).iloc[:, 12]. tolist() # TODO: add DM?
-        df['REFRAG_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 13]. tolist()
-        df['REFRAG_sum_intensity'] = pd.DataFrame(df.templist.tolist()).iloc[:, 14]. tolist()
-        df['REFRAG_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 15]. tolist()
-        df['REFRAG_name'] = pd.DataFrame(df.templist.tolist()).iloc[:, 16]. tolist()
-        df['REFRAG_sp_score'] = pd.DataFrame(df.templist.tolist()).iloc[:, 17]. tolist()
+        df['REFMOD_score_range'] = pd.DataFrame(df.templist.tolist()).iloc[:, 9]. tolist()
+        df['REFMOD_site_range'] = df.apply(lambda x: formatSiteRange(x.REFMOD_score_range, x.peptide), axis=1)
+        df['REFMOD_DM'] =  pd.DataFrame(df.templist.tolist()).iloc[:, 10]. tolist()
+        df['REFMOD_site'] = pd.DataFrame(df.templist.tolist()).iloc[:, 11]. tolist()
+        df['REFMOD_sequence'] = pd.DataFrame(df.templist.tolist()).iloc[:, 12]. tolist() # TODO: add DM?
+        df['REFMOD_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 13]. tolist()
+        df['REFMOD_sum_intensity'] = pd.DataFrame(df.templist.tolist()).iloc[:, 14]. tolist()
+        df['REFMOD_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 15]. tolist()
+        df['REFMOD_name'] = pd.DataFrame(df.templist.tolist()).iloc[:, 16]. tolist()
+        df['REFMOD_sp_score'] = pd.DataFrame(df.templist.tolist()).iloc[:, 17]. tolist()
         df = df.drop('templist', axis = 1)
         logging.info("Calculating FDR...")
-        df = globalFDR(df, 'REFRAG_hyperscore', prot_column, decoy_prefix, filter_target, filter_fdr)
+        df = globalFDR(df, 'REFMOD_hyperscore', prot_column, decoy_prefix, filter_target, filter_fdr)
         
         try:
-            refragged = len(df)-df.REFRAG_name.value_counts()['EXPERIMENTAL']
+            refragged = len(df)-df.REFMOD_name.value_counts()['EXPERIMENTAL']
         except KeyError:
             refragged = len(df)
         prefragged = round((refragged/len(df))*100,2)
-        logging.info("\t" + str(refragged) + " (" + str(prefragged) + "%) refragged PSMs.")
+        logging.info("\t" + str(refragged) + " (" + str(prefragged) + "%) refmodded PSMs.")
         endtime = datetime.now()
 
         logging.info("Preparing workspace...")
@@ -936,14 +936,15 @@ if __name__ == '__main__':
     # multiprocessing.freeze_support()
     # parse arguments
     parser = argparse.ArgumentParser(
-        description='ReFrag',
+        description='RefMod',
         epilog='''
         Example:
-            python ReFrag.py
+            python RefMod.py
 
         ''')
-        
-    defaultconfig = os.path.join(os.path.dirname(__file__), "ReFrag.ini")
+    
+    ROOT_DIR = Path(__file__).parent.parent
+    defaultconfig = ROOT_DIR/"config/RefMod.ini"
     
     # TODO parameter: exclude DM range (consider as NM)= default (-3, 0)
     parser.add_argument('-i',  '--infile', required=True, help='MSFragger results file')
