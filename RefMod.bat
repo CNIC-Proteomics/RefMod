@@ -3,7 +3,9 @@
 setlocal
 
 echo Attempting to launch RefMod...
-python src\RefMod_GUI.py
+REM Get the current directory
+set "BAT_DIR=%~dp0"
+python "%BAT_DIR%src\RefMod_GUI.py"
 if %errorlevel% equ 0 (
     goto :eof
 )
