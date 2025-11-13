@@ -5,7 +5,7 @@ Created on Tue Oct 21 11:20:47 2025
 @author: alaguillog
 """
 
-import PySimpleGUI as sg
+import FreeSimpleGUI as sg
 from PIL import Image
 from pathlib import Path
 import configparser
