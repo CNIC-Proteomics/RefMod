@@ -34,8 +34,8 @@ pd.options.mode.chained_assignment = None  # default='warn'
 shutup.please()
 
 def checkParams(mass, infiles):
-    min_frag_mz = int(mass._sections['Spectrum Processing']['min_fragment_mz'])
-    max_frag_mz = int(mass._sections['Spectrum Processing']['max_fragment_mz'])
+    min_frag_mz = float(mass._sections['Spectrum Processing']['min_fragment_mz'])
+    max_frag_mz = float(mass._sections['Spectrum Processing']['max_fragment_mz'])
     if (max_frag_mz > 0) & (max_frag_mz <= min_frag_mz):
         logging.error('max_frag_mz must be either 0 or a value greater than min_frag_mz')
         return(1)
