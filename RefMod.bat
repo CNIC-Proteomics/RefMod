@@ -26,6 +26,34 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+REM Get Python version
+for /f "tokens=2 delims= " %%a in ('python --version') do set PYVER=%%a
+for /f "tokens=1,2 delims=." %%b in ("%PYVER%") do (
+    set MAJOR=%%b
+    set MINOR=%%c
+)
+
+REM Check major version
+if %MAJOR% neq 3 (
+    echo Python ^>= 3.11 and ^< 3.14 is required. Found version %PYVER%.
+    pause
+    exit /b
+)
+
+REM Check minimum version (>= 3.11)
+if %MINOR% lss 11 (
+    echo Python ^>= 3.11 and ^< 3.14 is required. Found %PYVER%.
+    pause
+    exit /b
+)
+
+REM Check maximum version (< 3.14)
+if %MINOR% geq 14 (
+    echo Python ^>= 3.11 and ^< 3.14 is required. Found %PYVER%.
+    pause
+    exit /b
+)
+
 echo Checking pip installation...
 python -m pip --version >nul 2>&1
 if %errorlevel% neq 0 (
