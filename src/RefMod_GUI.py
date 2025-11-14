@@ -239,12 +239,23 @@ default_masses = {
 }
 
 default_mods = {
+    "Nt": 0, "Ct": 0,
     "A": 0, "R": 0, "N": 0, "D": 0, "C": 57.021464, "E": 0, "Q": 0, "G": 0,
     "H": 0, "I": 0, "L": 0, "K": 0, "M": 0, "F": 0, "P": 0, "S": 0,
     "T": 0, "U": 0, "W": 0, "Y": 0, "V": 0, "O": 0, "Z": 0
 }
 
 aa_rows = []
+aa_rows.append([
+    sg.Text("N-terminal", size=(25,1)),
+    sg.Text("", size=(17,1), pad=((0, 14), (0, 0))),
+    sg.Input(default_text=default_mods.get("Nt", ""), key="-Nt_FM-", size=(20,1), justification="right")
+    ])
+aa_rows.append([
+    sg.Text("C-terminal", size=(25,1)),
+    sg.Text("", size=(17,1), pad=((0, 14), (0, 0))),
+    sg.Input(default_text=default_mods.get("Ct", ""), key="-Ct_FM-", size=(20,1), justification="right")
+    ])
 for name, code in amino_acids:
     mass = default_masses.get(code.upper(), "")
     mods = default_mods.get(code.upper(), "")
@@ -459,6 +470,10 @@ while True:
                     window[f"-{code}_MASS-"].update(AAs[code.lower()])
                 if code.lower() in MODs:
                     window[f"-{code}_FM-"].update(MODs[code.lower()])
+            if "nt" in MODs:
+                window["-Nt_FM-"].update(MODs["nt"])
+            if "ct" in MODs:
+                window["-Ct_FM-"].update(MODs["ct"])
             # MASSES
             window["-PROTON_MASS-"].update(str(config._sections['Masses']['m_proton']))
             window["-HYDROGEN_MASS-"].update(str(config._sections['Masses']['m_hydrogen']))
@@ -501,9 +516,11 @@ while True:
                     "Masses.m_hydrogen": values["-HYDROGEN_MASS-"],
                     "Masses.m_oxygen": values["-OXYGEN_MASS-"]
                 }
+                config_data["Fixed Modifications.Nt"] = str(values["-Nt_FM-"])
+                config_data["Fixed Modifications.Ct"] = str(values["-Ct_FM-"])
                 for name, code in amino_acids:
-                    config_data[f"Aminoacids.{code.upper()}"] = str(values[f"-{code}_MASS-"])
-                    config_data[f"Fixed Modifications.{code.upper()}"] = str(values[f"-{code}_FM-"])
+                    config_data[f"Aminoacids.{code}"] = str(values[f"-{code}_MASS-"])
+                    config_data[f"Fixed Modifications.{code}"] = str(values[f"-{code}_FM-"])
                 
                 dict_to_ini(config_data, save_path)
                 #sg.popup("Configuration saved successfully!", title="Save Config")
@@ -520,6 +537,7 @@ while True:
             "V": 99.068414, "O": 132.089878, "Z": 129.042594
         }
         default_mods = {
+            "Nt": 0, "Ct": 0,
             "A": 0, "R": 0, "N": 0, "D": 0, "C": 57.021464, "E": 0, "Q": 0, "G": 0,
             "H": 0, "I": 0, "L": 0, "K": 0, "M": 0, "F": 0, "P": 0, "S": 0,
             "T": 0, "U": 0, "W": 0, "Y": 0, "V": 0, "O": 0, "Z": 0
@@ -553,6 +571,8 @@ while True:
                 mods = default_mods.get(code.upper(), "")
                 window[f"-{code}_MASS-"].update(mass)
                 window[f"-{code}_FM-"].update(mods)
+        window["-Nt_FM-"].update(0)
+        window["-Ct_FM-"].update(0)
         window["-PROTON_MASS-"].update(1.007276)
         window["-HYDROGEN_MASS-"].update(1.007825)
         window["-OXYGEN_MASS-"].update(15.994915)
