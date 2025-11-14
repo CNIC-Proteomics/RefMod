@@ -733,204 +733,207 @@ def main(args):
     
     infiles, rawfiles, rawbase = preProcess(args)
     
-    checked = checkParams(mass, infiles)
-    if checked != 0:
-        sys.exit("ERROR: Invalid parameters.")
-        
-    for f in infiles:
-        if os.path.basename(f).split(sep=".")[0] in rawbase:
-            infile = f
-            rawfile = rawfiles[rawbase.index(os.path.basename(f).split(sep=".")[0])]
-        else:
-            logging.info("ERROR: No MS data file (mzML or MGF) found for MSFragger file " + str(f) + "\nSkipping...")
-            continue
-
-        # Read results file from MSFragger
-        if len(args.dia) > 0:
-            logging.info("Reading MSFragger file (" + str(os.path.basename(Path(infile[0:-8] + infile[-4:]))) + ")...")
-            try: df = pd.read_csv(Path(infile[0:-8] + infile[-4:]), sep="\t")
-            except pd.errors.ParserError:
-                sep = '\t'
-                coln = pd.read_csv(Path(infile[0:-8] + infile[-4:]), sep=sep, nrows=1).columns.tolist()
-                max_columns = max(open(Path(infile[0:-8] + infile[-4:]), 'r'), key = lambda x: x.count(sep)).count(sep) + 1
-                coln += ['extra_column_' + str(i) for i in range(0,(max_columns-len(coln)))]
-                df = pd.read_csv(Path(infile[0:-8] + infile[-4:]), header=None, sep=sep, skiprows=1, names=coln)
-        else:
-            logging.info("Reading MSFragger file (" + str(os.path.basename(Path(infile))) + ")...")
-            try: df = pd.read_csv(Path(infile), sep="\t")
-            except pd.errors.ParserError:
-                sep = '\t'
-                coln = pd.read_csv(Path(infile), sep=sep, nrows=1).columns.tolist()
-                max_columns = max(open(Path(infile), 'r'), key = lambda x: x.count(sep)).count(sep) + 1
-                coln += ['extra_column_' + str(i) for i in range(0,(max_columns-len(coln)))]
-                df = pd.read_csv(Path(infile), header=None, sep=sep, skiprows=1, names=coln)
-        if len(args.scanrange) > 0:
-            logging.info("\tFiltering scan range " + str(args.scanrange[0]) + "-" + str(args.scanrange[1]) + "...")
-            df = df[(df.scannum>=args.scanrange[0])&(df.scannum<=args.scanrange[1])]
-        logging.info("\t" + str(len(df)) + " lines read.")
-        if len(df) < 1:
-            logging.error("No scans to search. Stopping.")
-            sys.exit()
-        # Read raw file
-        msdata, mode, index2 = readRaw(Path(rawfile))
-        # Read DM file
-        logging.info("Reading DM file (" + str(os.path.basename(Path(args.dmfile))) + ")...")
-        dmdf = pd.read_csv(Path(args.dmfile), sep="\t") # TODO check for duplicates (when both DM and SITE is the same)
-        dmdf = dmdf.iloc[:, :3]
-        dmdf.columns = ["name", "mass", "site"]
-        dmdf.site = dmdf.site.apply(literal_eval)
-        dmdf.site = dmdf.apply(lambda x: list(dict.fromkeys(x.site)), axis=1)
-        dmdf = dmdf.T.to_numpy()
-        #dmdf[3] = np.array([''.join(set(''.join(literal_eval(i)).replace('N-term', '0').replace('C-term', '1'))) for i in dmdf[3]]) # Nt = 0, Ct = 1
-        logging.info("\t" + str(len(dmdf[0])) + " theoretical DMs read.")
-        # Prepare to parallelize
-        logging.info("Refmodding...")
-        logging.info("\t" + "Locating scans...")
-        starttime = datetime.now()
-        if mode == "mzml":
-            spectra = msdata.getSpectra()
-            spectra_n = np.array([int(s.getNativeID().split("=")[-1]) for s in spectra])
-            # if len(args.scanrange) > 0:
-            #     logging.info("Filtering scan range " + str(args.scanrange[0]) + "-" + str(args.scanrange[1]) + "...")
-            #     spectra = spectra[np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[0]))[0][0]:np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[-1]))[0][-1]]
-            #     spectra_n = spectra_n[np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[0]))[0][0]:np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[-1]))[0][-1]]
-            peaks = [s.get_peaks() for s in spectra]
-            empty_peaks = set([i for i, p in enumerate(peaks) if len(p[0]) == 0])
-            # Skip empty spectra
-            if len(empty_peaks) > 0:
-                peaks = [p for i, p in enumerate(peaks) if i not in empty_peaks]
-                spectra_n = [s for i, s in enumerate(spectra_n) if i not in empty_peaks]
-            ions = [np.array([p[0], p[1]]) for p in peaks]
-            ions0 = [np.array(p[0]) for p in peaks]
-            ions1 = [np.array(p[1]) for p in peaks]
-            # Normalize intensity
-            logging.info("\t" + "Normalise intensity...")
-            ions1 = [(ions1[i]/max(ions1[i]))*100 for i in range(len(ions))]
-            # Remove peaks below min_ratio
-            logging.info("\t" + "Filter by ratio...")
-            if min_ratio > 0:
-                cutoff1 = [i/max(i) >= min_ratio for i in ions1]
-                ions0 = [ions0[i][cutoff1[i]] for i in range(len(ions))]
-                ions1 = [ions1[i][cutoff1[i]] for i in range(len(ions))]
-            # Remove peaks outside the min_frag_mz to max_frag_mz range
-            if min_frag_mz > 0:
-                cutoff0 = ions0/max(ions0) >= min_frag_mz
-                ions0 = ions0[cutoff0]
-                ions1 = ions1[cutoff0]
-            if max_frag_mz > 0:
-                cutoff0 = ions0/max(ions0) <= max_frag_mz
-                ions0 = ions0[cutoff0]
-                ions1 = ions1[cutoff0]
-            # Return only top N peaks
-            logging.info("\t" + "Filter top N...")
-            if top_n > 0:
-                cutoff1 = [i >= i[np.argsort(i)[len(i)-top_n]] if len(i)>top_n else i>0 for i in ions1]
-                ions0 = [ions0[i][cutoff1[i]] for i in range(len(ions))]
-                ions1 = [ions1[i][cutoff1[i]] for i in range(len(ions))]
-            ions = [np.array([ions0[i],ions1[i]]) for i in range(len(ions))]
-            # # Duplicate m/z measurement
-            logging.info("\t" + "Filter duplicate m/z measurements...")
-            check = [len(np.unique(i)) != len(i) for i in ions0]
-            for i in range(len(check)):
-                if check[i] == True:
-                    temp = ions[i].copy()
-                    temp = pd.DataFrame(temp).T
-                    temp = temp[temp.groupby(0)[1].rank(ascending=False)<2]
-                    temp.drop_duplicates(subset=0, inplace=True)
-                    ions[i] = np.array(temp.T)
-            cc = 0
-            for i in ions:
-                if len(i[0])<2:
-                    cc += 1
-            logging.info("\t" + str(cc) + " empty spectra...")
-        else:
-            df.scannum = df.scannum.astype(int)
-            df["spectrum"] = df.apply(lambda x: locateScan(x.scannum, mode, msdata,
-                                                           0, 0, index2, top_n,
-                                                           bin_top_n, min_ratio,
-                                                           min_frag_mz, max_frag_mz,
-                                                           m_proton, deiso, x.charge),
-                                      axis=1)
-        indices, rowSeries = zip(*df.iterrows())
-        rowSeries = list(rowSeries)
-        tqdm.pandas(position=0, leave=True)
-        if len(df) <= chunks:
-            chunks = math.ceil(len(df)/args.n_workers)
-        if mode == "mzml":
-            parlist = [mass, ftol, dmtol, dmdf, m_proton, m_hydrogen, m_oxygen, mode, spectra_n, ions, score_mode, full_y, preference]
-        else:
-            parlist = [mass, ftol, dmtol, dmdf, m_proton, m_hydrogen, m_oxygen, mode, score_mode, full_y, preference]
-        logging.info("\tBatch size: " + str(chunks) + " (" + str(math.ceil(len(df)/chunks)) + " batches)")
-        with concurrent.futures.ProcessPoolExecutor(max_workers=args.n_workers) as executor:
-            refrags = list(tqdm(executor.map(parallelFragging,
-                                             rowSeries,
-                                             itertools.repeat(parlist),
-                                             chunksize=chunks),
-                                total=len(rowSeries)))
-        if 'spectrum' in df.columns:
-            df = df.drop('spectrum', axis = 1)
-        df['templist'] = refrags
-        # Experimental information #
-        df['REFMOD_MH'] = pd.DataFrame(df.templist.tolist()).iloc[:, 0]. tolist()
-        df['REFMOD_exp_MZ'] = pd.DataFrame(df.templist.tolist()).iloc[:, 1]. tolist()
-        df['REFMOD_exp_DM'] = pd.DataFrame(df.templist.tolist()).iloc[:, 2]. tolist()
-        df['REFMOD_exp_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 3]. tolist()
-        df['REFMOD_exp_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 4]. tolist()
-          # TODO: df['REFMOD_exp_hyperscore_M']
-          # TODO: df['REFMOD_exp_hyperscore_H']
-        # Non-modified information #
-        df['REFMOD_nm_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 5]. tolist()
-        df['REFMOD_nm_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 6]. tolist()
-        # Modified information # (TESTING)
-        if debug_scores:
-            df['REFMOD_MOD_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 7]. tolist()
-            df['REFMOD_HYB_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 8]. tolist()
-        # Best candidate information #
-        df['REFMOD_score_range'] = pd.DataFrame(df.templist.tolist()).iloc[:, 9]. tolist()
-        df['REFMOD_site_range'] = df.apply(lambda x: formatSiteRange(x.REFMOD_score_range, x.peptide), axis=1)
-        df['REFMOD_DM'] =  pd.DataFrame(df.templist.tolist()).iloc[:, 10]. tolist()
-        df['REFMOD_site'] = pd.DataFrame(df.templist.tolist()).iloc[:, 11]. tolist()
-        df['REFMOD_sequence'] = pd.DataFrame(df.templist.tolist()).iloc[:, 12]. tolist() # TODO: add DM?
-        df['REFMOD_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 13]. tolist()
-        df['REFMOD_sum_intensity'] = pd.DataFrame(df.templist.tolist()).iloc[:, 14]. tolist()
-        df['REFMOD_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 15]. tolist()
-        df['REFMOD_name'] = pd.DataFrame(df.templist.tolist()).iloc[:, 16]. tolist()
-        df['REFMOD_sp_score'] = pd.DataFrame(df.templist.tolist()).iloc[:, 17]. tolist()
-        df = df.drop('templist', axis = 1)
-        logging.info("Calculating FDR...")
-        df = globalFDR(df, 'REFMOD_hyperscore', prot_column, decoy_prefix, filter_target, filter_fdr)
-        
-        try:
-            refragged = len(df)-df.REFMOD_name.value_counts()['EXPERIMENTAL']
-        except KeyError:
-            refragged = len(df)
-        prefragged = round((refragged/len(df))*100,2)
-        logging.info("\t" + str(refragged) + " (" + str(prefragged) + "%) refmodded PSMs.")
-        endtime = datetime.now()
-
-        logging.info("Preparing workspace...")
-        # get the name of script
-        script_name = os.path.splitext( os.path.basename(__file__) )[0].upper()
-        # if output directory is not defined, get the folder from given file + script name
-        outdir = args.outdir if args.outdir else os.path.join(os.path.dirname(infile), script_name.lower())
-        os.makedirs(outdir, exist_ok=True)
-        basename = os.path.basename(infile)
-        outpath = Path(outdir) / basename
-        outsum = Path(outdir) / f"{Path(basename).stem}_SUMMARY{Path(basename).suffix}"
-
-        if len(args.scanrange) > 0:
-            outpath = Path(outdir) / f"{outpath.stem}_{str(args.scanrange[0]) + '-' + str(args.scanrange[1])}{outpath.suffix}"
-        logging.info(f"Writing output file {outpath}...")
-        df.to_csv(outpath, index=False, sep='\t', encoding='utf-8')
-        logging.info("Done.")
-
-        if create_summary:
+    try:
+        checked = checkParams(mass, infiles)
+        if checked != 0:
+            sys.exit("ERROR: Invalid parameters.")
+            
+        for f in infiles:
+            if os.path.basename(f).split(sep=".")[0] in rawbase:
+                infile = f
+                rawfile = rawfiles[rawbase.index(os.path.basename(f).split(sep=".")[0])]
+            else:
+                logging.info("ERROR: No MS data file (mzML or MGF) found for MSFragger file " + str(f) + "\nSkipping...")
+                continue
+    
+            # Read results file from MSFragger
+            if len(args.dia) > 0:
+                logging.info("Reading MSFragger file (" + str(os.path.basename(Path(infile[0:-8] + infile[-4:]))) + ")...")
+                try: df = pd.read_csv(Path(infile[0:-8] + infile[-4:]), sep="\t")
+                except pd.errors.ParserError:
+                    sep = '\t'
+                    coln = pd.read_csv(Path(infile[0:-8] + infile[-4:]), sep=sep, nrows=1).columns.tolist()
+                    max_columns = max(open(Path(infile[0:-8] + infile[-4:]), 'r'), key = lambda x: x.count(sep)).count(sep) + 1
+                    coln += ['extra_column_' + str(i) for i in range(0,(max_columns-len(coln)))]
+                    df = pd.read_csv(Path(infile[0:-8] + infile[-4:]), header=None, sep=sep, skiprows=1, names=coln)
+            else:
+                logging.info("Reading MSFragger file (" + str(os.path.basename(Path(infile))) + ")...")
+                try: df = pd.read_csv(Path(infile), sep="\t")
+                except pd.errors.ParserError:
+                    sep = '\t'
+                    coln = pd.read_csv(Path(infile), sep=sep, nrows=1).columns.tolist()
+                    max_columns = max(open(Path(infile), 'r'), key = lambda x: x.count(sep)).count(sep) + 1
+                    coln += ['extra_column_' + str(i) for i in range(0,(max_columns-len(coln)))]
+                    df = pd.read_csv(Path(infile), header=None, sep=sep, skiprows=1, names=coln)
             if len(args.scanrange) > 0:
-                outsum = Path(outdir) / f"{outsum.stem}_{str(args.scanrange[0]) + '-' + str(args.scanrange[1])}{outsum.suffix}"
-            logging.info(f"Writing summary file {outsum}...")
-            makeSummary(df, outsum, infile, rawfile, args.dmfile, starttime, endtime, decoy_prefix, prot_column)
+                logging.info("\tFiltering scan range " + str(args.scanrange[0]) + "-" + str(args.scanrange[1]) + "...")
+                df = df[(df.scannum>=args.scanrange[0])&(df.scannum<=args.scanrange[1])]
+            logging.info("\t" + str(len(df)) + " lines read.")
+            if len(df) < 1:
+                logging.error("No scans to search. Stopping.")
+                sys.exit()
+            # Read raw file
+            msdata, mode, index2 = readRaw(Path(rawfile))
+            # Read DM file
+            logging.info("Reading DM file (" + str(os.path.basename(Path(args.dmfile))) + ")...")
+            dmdf = pd.read_csv(Path(args.dmfile), sep="\t") # TODO check for duplicates (when both DM and SITE is the same)
+            dmdf = dmdf.iloc[:, :3]
+            dmdf.columns = ["name", "mass", "site"]
+            dmdf.site = dmdf.site.apply(literal_eval)
+            dmdf.site = dmdf.apply(lambda x: list(dict.fromkeys(x.site)), axis=1)
+            dmdf = dmdf.T.to_numpy()
+            #dmdf[3] = np.array([''.join(set(''.join(literal_eval(i)).replace('N-term', '0').replace('C-term', '1'))) for i in dmdf[3]]) # Nt = 0, Ct = 1
+            logging.info("\t" + str(len(dmdf[0])) + " theoretical DMs read.")
+            # Prepare to parallelize
+            logging.info("Refmodding...")
+            logging.info("\t" + "Locating scans...")
+            starttime = datetime.now()
+            if mode == "mzml":
+                spectra = msdata.getSpectra()
+                spectra_n = np.array([int(s.getNativeID().split("=")[-1]) for s in spectra])
+                # if len(args.scanrange) > 0:
+                #     logging.info("Filtering scan range " + str(args.scanrange[0]) + "-" + str(args.scanrange[1]) + "...")
+                #     spectra = spectra[np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[0]))[0][0]:np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[-1]))[0][-1]]
+                #     spectra_n = spectra_n[np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[0]))[0][0]:np.where((np.array(spectra_n)>=0)&(np.array(spectra_n)<=args.scanrange[-1]))[0][-1]]
+                peaks = [s.get_peaks() for s in spectra]
+                empty_peaks = set([i for i, p in enumerate(peaks) if len(p[0]) == 0])
+                # Skip empty spectra
+                if len(empty_peaks) > 0:
+                    peaks = [p for i, p in enumerate(peaks) if i not in empty_peaks]
+                    spectra_n = [s for i, s in enumerate(spectra_n) if i not in empty_peaks]
+                ions = [np.array([p[0], p[1]]) for p in peaks]
+                ions0 = [np.array(p[0]) for p in peaks]
+                ions1 = [np.array(p[1]) for p in peaks]
+                # Normalize intensity
+                logging.info("\t" + "Normalise intensity...")
+                ions1 = [(ions1[i]/max(ions1[i]))*100 for i in range(len(ions))]
+                # Remove peaks below min_ratio
+                logging.info("\t" + "Filter by ratio...")
+                if min_ratio > 0:
+                    cutoff1 = [i/max(i) >= min_ratio for i in ions1]
+                    ions0 = [ions0[i][cutoff1[i]] for i in range(len(ions))]
+                    ions1 = [ions1[i][cutoff1[i]] for i in range(len(ions))]
+                # Remove peaks outside the min_frag_mz to max_frag_mz range
+                if min_frag_mz > 0:
+                    cutoff0 = ions0/max(ions0) >= min_frag_mz
+                    ions0 = ions0[cutoff0]
+                    ions1 = ions1[cutoff0]
+                if max_frag_mz > 0:
+                    cutoff0 = ions0/max(ions0) <= max_frag_mz
+                    ions0 = ions0[cutoff0]
+                    ions1 = ions1[cutoff0]
+                # Return only top N peaks
+                logging.info("\t" + "Filter top N...")
+                if top_n > 0:
+                    cutoff1 = [i >= i[np.argsort(i)[len(i)-top_n]] if len(i)>top_n else i>0 for i in ions1]
+                    ions0 = [ions0[i][cutoff1[i]] for i in range(len(ions))]
+                    ions1 = [ions1[i][cutoff1[i]] for i in range(len(ions))]
+                ions = [np.array([ions0[i],ions1[i]]) for i in range(len(ions))]
+                # # Duplicate m/z measurement
+                logging.info("\t" + "Filter duplicate m/z measurements...")
+                check = [len(np.unique(i)) != len(i) for i in ions0]
+                for i in range(len(check)):
+                    if check[i] == True:
+                        temp = ions[i].copy()
+                        temp = pd.DataFrame(temp).T
+                        temp = temp[temp.groupby(0)[1].rank(ascending=False)<2]
+                        temp.drop_duplicates(subset=0, inplace=True)
+                        ions[i] = np.array(temp.T)
+                cc = 0
+                for i in ions:
+                    if len(i[0])<2:
+                        cc += 1
+                logging.info("\t" + str(cc) + " empty spectra...")
+            else:
+                df.scannum = df.scannum.astype(int)
+                df["spectrum"] = df.apply(lambda x: locateScan(x.scannum, mode, msdata,
+                                                               0, 0, index2, top_n,
+                                                               bin_top_n, min_ratio,
+                                                               min_frag_mz, max_frag_mz,
+                                                               m_proton, deiso, x.charge),
+                                          axis=1)
+            indices, rowSeries = zip(*df.iterrows())
+            rowSeries = list(rowSeries)
+            tqdm.pandas(position=0, leave=True)
+            if len(df) <= chunks:
+                chunks = math.ceil(len(df)/args.n_workers)
+            if mode == "mzml":
+                parlist = [mass, ftol, dmtol, dmdf, m_proton, m_hydrogen, m_oxygen, mode, spectra_n, ions, score_mode, full_y, preference]
+            else:
+                parlist = [mass, ftol, dmtol, dmdf, m_proton, m_hydrogen, m_oxygen, mode, score_mode, full_y, preference]
+            logging.info("\tBatch size: " + str(chunks) + " (" + str(math.ceil(len(df)/chunks)) + " batches)")
+            with concurrent.futures.ProcessPoolExecutor(max_workers=args.n_workers) as executor:
+                refrags = list(tqdm(executor.map(parallelFragging,
+                                                 rowSeries,
+                                                 itertools.repeat(parlist),
+                                                 chunksize=chunks),
+                                    total=len(rowSeries)))
+            if 'spectrum' in df.columns:
+                df = df.drop('spectrum', axis = 1)
+            df['templist'] = refrags
+            # Experimental information #
+            df['REFMOD_MH'] = pd.DataFrame(df.templist.tolist()).iloc[:, 0]. tolist()
+            df['REFMOD_exp_MZ'] = pd.DataFrame(df.templist.tolist()).iloc[:, 1]. tolist()
+            df['REFMOD_exp_DM'] = pd.DataFrame(df.templist.tolist()).iloc[:, 2]. tolist()
+            df['REFMOD_exp_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 3]. tolist()
+            df['REFMOD_exp_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 4]. tolist()
+              # TODO: df['REFMOD_exp_hyperscore_M']
+              # TODO: df['REFMOD_exp_hyperscore_H']
+            # Non-modified information #
+            df['REFMOD_nm_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 5]. tolist()
+            df['REFMOD_nm_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 6]. tolist()
+            # Modified information # (TESTING)
+            if debug_scores:
+                df['REFMOD_MOD_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 7]. tolist()
+                df['REFMOD_HYB_hs'] = pd.DataFrame(df.templist.tolist()).iloc[:, 8]. tolist()
+            # Best candidate information #
+            df['REFMOD_score_range'] = pd.DataFrame(df.templist.tolist()).iloc[:, 9]. tolist()
+            df['REFMOD_site_range'] = df.apply(lambda x: formatSiteRange(x.REFMOD_score_range, x.peptide), axis=1)
+            df['REFMOD_DM'] =  pd.DataFrame(df.templist.tolist()).iloc[:, 10]. tolist()
+            df['REFMOD_site'] = pd.DataFrame(df.templist.tolist()).iloc[:, 11]. tolist()
+            df['REFMOD_sequence'] = pd.DataFrame(df.templist.tolist()).iloc[:, 12]. tolist() # TODO: add DM?
+            df['REFMOD_ions_matched'] = pd.DataFrame(df.templist.tolist()).iloc[:, 13]. tolist()
+            df['REFMOD_sum_intensity'] = pd.DataFrame(df.templist.tolist()).iloc[:, 14]. tolist()
+            df['REFMOD_hyperscore'] = pd.DataFrame(df.templist.tolist()).iloc[:, 15]. tolist()
+            df['REFMOD_name'] = pd.DataFrame(df.templist.tolist()).iloc[:, 16]. tolist()
+            df['REFMOD_sp_score'] = pd.DataFrame(df.templist.tolist()).iloc[:, 17]. tolist()
+            df = df.drop('templist', axis = 1)
+            logging.info("Calculating FDR...")
+            df = globalFDR(df, 'REFMOD_hyperscore', prot_column, decoy_prefix, filter_target, filter_fdr)
+            
+            try:
+                refragged = len(df)-df.REFMOD_name.value_counts()['EXPERIMENTAL']
+            except KeyError:
+                refragged = len(df)
+            prefragged = round((refragged/len(df))*100,2)
+            logging.info("\t" + str(refragged) + " (" + str(prefragged) + "%) refmodded PSMs.")
+            endtime = datetime.now()
+    
+            logging.info("Preparing workspace...")
+            # get the name of script
+            script_name = os.path.splitext( os.path.basename(__file__) )[0].upper()
+            # if output directory is not defined, get the folder from given file + script name
+            outdir = args.outdir if args.outdir else os.path.join(os.path.dirname(infile), script_name.lower())
+            os.makedirs(outdir, exist_ok=True)
+            basename = os.path.basename(infile)
+            outpath = Path(outdir) / basename
+            outsum = Path(outdir) / f"{Path(basename).stem}_SUMMARY{Path(basename).suffix}"
+    
+            if len(args.scanrange) > 0:
+                outpath = Path(outdir) / f"{outpath.stem}_{str(args.scanrange[0]) + '-' + str(args.scanrange[1])}{outpath.suffix}"
+            logging.info(f"Writing output file {outpath}...")
+            df.to_csv(outpath, index=False, sep='\t', encoding='utf-8')
             logging.info("Done.")
-
+    
+            if create_summary:
+                if len(args.scanrange) > 0:
+                    outsum = Path(outdir) / f"{outsum.stem}_{str(args.scanrange[0]) + '-' + str(args.scanrange[1])}{outsum.suffix}"
+                logging.info(f"Writing summary file {outsum}...")
+                makeSummary(df, outsum, infile, rawfile, args.dmfile, starttime, endtime, decoy_prefix, prot_column)
+                logging.info("Done.")
+    except MemoryError:
+        logging.error("Out of memory!")
+        sys.exit(1)
     return
 
 if __name__ == '__main__':
